@@ -18,6 +18,10 @@ void SuperblockSummary()
 {
     off_t offset = 1024; //for ext2: "primary copy of superblock is stored at offset of 1024 bytes from the start of the device"
     pread(image_fd, &superBLK, sizeof(superBLK), offset);
+    {
+        fprintf(stderr, "Error, could not find super block\n");
+        exit(1);
+    }
     dprintf(STDOUT_FILENO, "SUPERBLOCK,%d,%d,%d,%d,%d,%d,%d\n", superBLK.s_blocks_count, superBLK.s_inodes_count, block_size, 
         superBLK.s_inode_size, superBLK.s_blocks_per_group, superBLK.s_inodes_per_group, superBLK.s_first_ino);
 }
@@ -28,10 +32,6 @@ void GroupSummary()
     //we are only working on single group
     off_t offset = 1024 + block_size; //offset for superblock + superblock's size to get the offset for groups
     pread(image_fd, &groupBLK, 32, offset); //size of the block group descriptor structure is 32 bytes
-    {
-        fprintf(stderr, "Error, could not find super block\n");
-        exit(1);
-    }
     dprintf(STDOUT_FILENO, "GROUP,0,%d,%d,%d,%d,%d,%d,%d\n", superBLK.s_blocks_count, superBLK.s_inodes_per_group, groupBLK.bg_free_blocks_count,
         groupBLK.bg_free_inodes_count, groupBLK.bg_block_bitmap, groupBLK.bg_inode_bitmap, groupBLK.bg_inode_table);
 }
