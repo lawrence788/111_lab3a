@@ -18,6 +18,7 @@ void SuperblockSummary()
 {
     off_t offset = 1024; //for ext2: "primary copy of superblock is stored at offset of 1024 bytes from the start of the device"
     pread(image_fd, &superBLK, sizeof(superBLK), offset);
+    if(superBLK.s_magic != EXT2_SUPER_MAGIC)
     {
         fprintf(stderr, "Error, could not find super block\n");
         exit(1);
