@@ -2,13 +2,13 @@
 // EMAIL: maguanqun0212@gmail.com
 // ID: 305331164
 
-#include<stdio.h>
-#include<unistd.h>
-#include<stdlib.h>
+#include <stdio.h>
+#include <unistd.h>
+#include <stdlib.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
-#include <time.h> 
+#include <time.h>  
 #include "ext2_fs.h"
 
 int image_fd;
@@ -55,18 +55,17 @@ void InodeSummary()
 
         //file type
         char file_type = '?';
-        __u16 i_mode = inode_id[i].i_mode & 0xF000; //AND first four bits and set the rest to zero
-        if(i_mode == 0x8000) //regular file
+        switch (inode_id[i].i_mode & S_IFMT)
         {
-            file_type = 'f';
-        }
-        else if(i_mode == 0x4000) //directory
-        {
-            file_type = 'd';
-        }
-        else if(i_mode == 0xA000) //symbolic link
-        {
-            file_type = 's';
+            case S_IFREG:
+                file_type = 'f'; //regular file
+                break;
+            case S_IFDIR:
+                file_type = 'd'; //directory
+                break;
+            case S_IFLNK:
+                file_type = 's'; //symbolic link
+                break;
         }
 
         //mode
@@ -96,6 +95,31 @@ void InodeSummary()
             }
         }
         dprintf(STDOUT_FILENO, "\n");
+
+        //directory entries
+        if(file_type == 'd')
+        {
+            for(int k = 0; k < EXT2_NDIR_BLOCKS; k++) //first 12 are direct blocks
+            {
+                if(inode_id[i].i_block[k] != 0) //directory entry is not empty
+                {
+                    unsigned int logicalOffset = 0;
+                    while(logicalOffset < block_size)
+                    {
+                        off_t dir_offset = inode_id[i].i_block[k] * block_size + logicalOffset;
+                        struct ext2_dir_entry dirEntry;
+                        pread(image_fd, &dirEntry, sizeof(struct ext2_dir_entry), dir_offset);
+                        if(dirEntry.inode != 0) //non-zero inode number
+                        {
+                            dprintf(STDOUT_FILENO, "DIRENT,%d,%d,%d,%d,%d,'%s'\n", i+1, logicalOffset, dirEntry.inode, 
+                                dirEntry.rec_len, dirEntry.name_len, dirEntry.name);
+                        }
+
+                        logicalOffset += dirEntry.rec_len;
+                    }
+                }
+            }
+        }
     }
 }
 
