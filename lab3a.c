@@ -8,6 +8,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <time.h> 
 #include "ext2_fs.h"
 
 int image_fd;
@@ -37,6 +38,67 @@ void GroupSummary()
         groupBLK.bg_free_inodes_count, groupBLK.bg_block_bitmap, groupBLK.bg_inode_bitmap, groupBLK.bg_inode_table);
 }
 
+void InodeSummary()
+{
+    __u32 num_inodes = superBLK.s_inodes_count;
+    struct ext2_inode* inode_id = (struct ext2_inode*)malloc(num_inodes * sizeof(struct ext2_inode));
+    off_t offset = 1024 + 4 * block_size; //offset for superblock + 4 blocks whose size is "block_size"
+    size_t inode_size = sizeof(struct ext2_inode);
+    for(__u32 i = 0; i < num_inodes; i++)
+    {
+        pread(image_fd, &inode_id[i], inode_size, offset + i * inode_size);
+
+        if(inode_id[i].i_mode == 0 || inode_id[i].i_links_count == 0)
+        {
+            continue;
+        }
+
+        //file type
+        char file_type = '?';
+        __u16 i_mode = inode_id[i].i_mode & 0xF000; //AND first four bits and set the rest to zero
+        if(i_mode == 0x8000) //regular file
+        {
+            file_type = 'f';
+        }
+        else if(i_mode == 0x4000) //directory
+        {
+            file_type = 'd';
+        }
+        else if(i_mode == 0xA000) //symbolic link
+        {
+            file_type = 's';
+        }
+
+        //mode
+        __u16 mode = inode_id[i].i_mode & 0xFFF; //to get the low order 12-bits
+
+        //time
+        char ctime_storage[20], mtime_storage[20], atime_storage[20];
+        time_t temp_time = inode_id[i].i_ctime;
+        struct tm *ptm = gmtime(&temp_time);
+        strftime(ctime_storage, 20, "%m/%d/%y %H:%M:%S", ptm);
+        temp_time = inode_id[i].i_mtime;
+        ptm = gmtime(&temp_time);
+        strftime(mtime_storage, 20, "%m/%d/%y %H:%M:%S", ptm);
+        temp_time = inode_id[i].i_atime;
+        ptm = gmtime(&temp_time);
+        strftime(atime_storage, 20, "%m/%d/%y %H:%M:%S", ptm);
+       
+        dprintf(STDOUT_FILENO, "INODE,%d,%c,%o,%d,%d,%d,%s,%s,%s,%d,%d", i+1, file_type, mode, inode_id[i].i_uid,
+            inode_id[i].i_gid, inode_id[i].i_links_count, ctime_storage, mtime_storage, atime_storage,
+            inode_id[i].i_size, inode_id[i].i_blocks);
+        
+        if((file_type != 's') || (file_type == 's' && inode_id[i].i_blocks != 0))
+        {
+            for(int j = 0; j < 15; j++)
+            {
+                dprintf(STDOUT_FILENO, ",%d", inode_id[i].i_block[j]);
+            }
+        }
+        dprintf(STDOUT_FILENO, "\n");
+    }
+}
+
 int main(int argc, char *argv[])
 {
     if(argc != 2)
@@ -55,6 +117,7 @@ int main(int argc, char *argv[])
 
     SuperblockSummary();
     GroupSummary();
+    InodeSummary();
 
     return 0;
 }
