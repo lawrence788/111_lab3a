@@ -22,7 +22,7 @@ void SuperblockSummary()
     if(superBLK.s_magic != EXT2_SUPER_MAGIC)
     {
         fprintf(stderr, "Error, could not find super block\n");
-        exit(1);
+        exit(2);
     }
     dprintf(STDOUT_FILENO, "SUPERBLOCK,%d,%d,%d,%d,%d,%d,%d\n", superBLK.s_blocks_count, superBLK.s_inodes_count, block_size, 
         superBLK.s_inode_size, superBLK.s_blocks_per_group, superBLK.s_inodes_per_group, superBLK.s_first_ino);
